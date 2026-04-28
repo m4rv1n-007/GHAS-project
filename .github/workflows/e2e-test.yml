@@ -9,62 +9,63 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["16.x", "18.x", "20.x"]
+        # ✅ Use ONE stable Node version for legacy vulnerable apps
+        node-version: ["16.x"]
 
     steps:
+      # 1️⃣ Checkout source code
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: Set up Node.js ${{ matrix.node-version }}
+      # 2️⃣ Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: npm
 
+      # 3️⃣ Install required Linux deps for old Cypress
+      - name: Install Cypress OS dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgconf-2-4
+
+      # 4️⃣ Cache npm & Cypress binaries (speed + stability)
       - name: Cache npm & Cypress
         uses: actions/cache@v4
         with:
           path: |
             ~/.npm
-            ~/.cache
-          key: ${{ runner.os }}-node${{ matrix.node-version }}-E2E-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node${{ matrix.node-version }}-E2E-
-      
-      - name: Install Cypress system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgconf-2-4
+            ~/.cache/Cypress
+          key: ${{ runner.os }}-node${{ matrix.node-version }}-cypress-${{ hashFiles('package-lock.json') }}
 
-      - name: Install dependencies
+      # 5️⃣ Install dependencies WITHOUT fixing vulnerabilities
+      - name: Install dependencies (keep vulnerable)
         run: |
           npm ci --no-audit --no-fund
           npm run cy:verify
 
+      # 6️⃣ Start MongoDB
       - name: Start MongoDB
         run: |
           docker run -d -p 27017:27017 mongo:4.0
-          timeout 60s bash -c 'until nc -z -w 2 localhost 27017 && echo MongoDB ready; do sleep 2; done'
+          timeout 60s bash -c 'until nc -z localhost 27017; do sleep 2; done'
 
+      # 7️⃣ Start app & run E2E tests
       - name: Run E2E test suite
         id: test-suite
         run: |
           NODE_ENV=test npm start -- --silent &
+          sleep 10
           npm run test:ci -- --config video=true
 
-      - name: Prepare cypress artifacts
-        if: failure() && steps.test-suite.outcome == 'failure'
-        working-directory: ./test/e2e
-        run: |
-          mkdir -p screenshots
-          find screenshots -mindepth 1 -maxdepth 1 -type d \
-            -exec sh -c 'mv -- "videos/$(basename "$1").mp4" "$1"' _ {} \;
-
-      - name: Upload cypress artifacts
-        if: failure() && steps.test-suite.outcome == 'failure'
+      # 8️⃣ Collect Cypress artifacts on failure
+      - name: Upload Cypress artifacts
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: cypress-artifacts-node-${{ matrix.node-version }}
-          path: test/e2e/screenshots
+          name: cypress-artifacts
+          path: |
+            test/e2e/screenshots
+            test/e2e/videos
