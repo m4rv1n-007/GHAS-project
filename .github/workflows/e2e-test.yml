@@ -32,10 +32,15 @@ jobs:
           key: ${{ runner.os }}-node${{ matrix.node-version }}-E2E-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node${{ matrix.node-version }}-E2E-
+      
+      - name: Install Cypress system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgconf-2-4
 
       - name: Install dependencies
         run: |
-          npm ci
+          npm ci --no-audit --no-fund
           npm run cy:verify
 
       - name: Start MongoDB
