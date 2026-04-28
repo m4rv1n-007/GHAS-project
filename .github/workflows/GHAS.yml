@@ -1,0 +1,41 @@
+# Workflow name shown in the GitHub Actions UI
+name: NodeGoat CI + CodeQL
+
+
+# Events that trigger this workflow.
+# - push: runs when commits are pushed to main
+# - pull_request: runs when PRs target main
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # -------------------------------------------------
+  # Job 1: Build & Test
+  # - Installs dependencies
+  # - Builds the app (if build script exists)
+  # - Runs unit tests
+  # - Acts as a quality gate before CodeQL
+  # -------------------------------------------------
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (if present)
+        run: npm run build --if-present
+
+      - name: Run tests
+        run: npm test
