@@ -4,7 +4,7 @@ on: [push, pull_request]
 jobs:
   e2e-test:
     name: Node.js E2E
-    runs-on: ubuntu-20.04   # ✅ CRITICAL FIX
+    runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
